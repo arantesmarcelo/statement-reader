@@ -1,4 +1,5 @@
 # importing required classes
+import os
 import re
 import sys
 from pypdf import PdfReader
@@ -15,7 +16,7 @@ def isfloat(num):
 
 
 # Function to parse the transaction data
-def parse_transactions(data):
+def parse_transactions(data, month):
     #
 
     transactions = []
@@ -52,7 +53,7 @@ def parse_transactions(data):
         # Description
         description_string = []
         # pattern = re.compile(r'^\*.*')
-        while i < len(data) and not (any(re.match(pattern, data[i]) for pattern in ["Jul", "SBSAV", r'^\*'])):
+        while i < len(data) and not (any(re.match(pattern, data[i]) for pattern in [month, "SBSAV", r'^\*'])):
             description_string.append(data[i])
             i += 1
         new_transaction.description = ' '.join(description_string)
@@ -65,62 +66,68 @@ def parse_transactions(data):
 
 
 if __name__ == '__main__':
-    # creating a pdf reader object
-    reader = PdfReader('Jul24.pdf')
+    # get the current folder
+    folder_path = os.getcwd()
 
-    my_transactions = []
+    # loop through each pdf file
+    for filename in os.listdir(folder_path):
+        if filename.endswith('.pdf'):
+            file_path = os.path.join(folder_path, filename)
 
-    my_dict = {
-        "Date": [],
-        "Type": [],
-        "Description": [],
-        "Amount": [],
-        "Balance": []
-    }
+            # creating a pdf reader object
+            reader = PdfReader(file_path)
 
-    # loop through the pages
-    for p in range(0, reader.get_num_pages() - 1):
-        print("reading page: ", p)
-        # creating a page object
-        page = reader.pages[p]
-        # create a list of strings from page
-        my_list = page.extract_text().split()
+            my_transactions = []
 
-        # find the month
-        month_list = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-        flag = 0
-        month = ""
-        for i in my_list:
-            for j in month_list:
-                if i == j:
-                    flag = 1
-                    month = j
-                    print("Found month: ", j)
+            my_dict = {
+                "Date": [],
+                "Type": [],
+                "Description": [],
+                "Amount": [],
+                "Balance": []
+            }
+
+            # loop through the pages
+            for p in range(0, reader.get_num_pages()):
+                print("reading page: ", p)
+                # creating a page object
+                page = reader.pages[p]
+                # create a list of strings from page
+                my_list = page.extract_text().split()
+
+                # find the month
+                month_list = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+                flag = 0
+                month = ""
+                for i in my_list:
+                    if i in month_list:
+                        flag = 1
+                        month = i
+                        break
+                    if flag == 1:
+                        break
+
+                if flag == 0:
+                    print("Month not found")
                     break
-            if flag == 1:
-                break
 
-        if flag == 0:
-            print("Month not found")
-            sys.exit()
-        print("got here")
-        # set the last element for each page
-        first = my_list.index(month)
+                # set the last element for each page
+                first = my_list.index(month)
 
-        new_list = my_list[first:len(my_list)]
+                new_list = my_list[first:len(my_list)]
 
-        # Parse the transactions
-        my_transactions = parse_transactions(new_list)
+                # Parse the transactions
+                my_transactions = parse_transactions(new_list, month)
 
-        # Print each transaction
-        for transaction in my_transactions:
-            my_dict["Date"].append(transaction.date)
-            my_dict["Type"].append(transaction.type)
-            my_dict["Description"].append(transaction.description)
-            my_dict["Amount"].append(transaction.amount)
-            my_dict["Balance"].append(transaction.balance)
-            transaction.print_me()
-            print("-----")
+                # append data into dictionary each transaction
+                for transaction in my_transactions:
+                    my_dict["Date"].append(transaction.date)
+                    my_dict["Type"].append(transaction.type)
+                    my_dict["Description"].append(transaction.description)
+                    my_dict["Amount"].append(transaction.amount)
+                    my_dict["Balance"].append(transaction.balance)
+                    transaction.print_me()
+                    print("-----")
 
-    df = pd.DataFrame(my_dict)
-    df.to_csv('sample_data.csv', sep=',', index=False, encoding='utf-8')
+            df = pd.DataFrame(my_dict)
+            df.to_csv(f'{filename.split(".")[0]}.csv', sep=',', index=False, encoding='utf-8')
