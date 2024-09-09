@@ -1,7 +1,5 @@
-# importing required classes
 import os
 import re
-import sys
 from pypdf import PdfReader
 import pandas as pd
 from Transaction import Transaction
@@ -16,7 +14,7 @@ def isfloat(num):
 
 
 # Function to parse the transaction data
-def parse_transactions(data, month):
+def parse_transactions(data, period):
     #
 
     transactions = []
@@ -27,7 +25,7 @@ def parse_transactions(data, month):
         new_transaction = Transaction()
 
         # Date
-        new_transaction.date = data[i] + " " + data[i + 1]
+        new_transaction.date = data[i] + "-" + data[i + 1] + "-" + str(period[1])
         i += 2
 
         # Type: Collect elements until we reach the amount
@@ -53,7 +51,7 @@ def parse_transactions(data, month):
         # Description
         description_string = []
         # pattern = re.compile(r'^\*.*')
-        while i < len(data) and not (any(re.match(pattern, data[i]) for pattern in [month, "SBSAV", r'^\*'])):
+        while i < len(data) and not (any(re.match(pattern, data[i]) for pattern in [period[0], "SBSAV", r'^\*\d{3,}'])):
             description_string.append(data[i])
             i += 1
         new_transaction.description = ' '.join(description_string)
@@ -71,6 +69,8 @@ if __name__ == '__main__':
 
     # loop through each pdf file
     for filename in os.listdir(folder_path):
+        found_year = False
+        year = 0
         if filename.endswith('.pdf'):
             file_path = os.path.join(folder_path, filename)
 
@@ -95,6 +95,16 @@ if __name__ == '__main__':
                 # create a list of strings from page
                 my_list = page.extract_text().split()
 
+                # DEBUG
+                print(my_list)
+                if not found_year:
+                    try:
+                        year: int = int(my_list[my_list.index("Opening") + 5])
+                        found_year = True
+                        print("found year: ", year)
+                    except:
+                        year = 0
+
                 # find the month
                 month_list = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
                 flag = 0
@@ -116,8 +126,9 @@ if __name__ == '__main__':
 
                 new_list = my_list[first:len(my_list)]
 
+                period = [month, year]
                 # Parse the transactions
-                my_transactions = parse_transactions(new_list, month)
+                my_transactions = parse_transactions(new_list, period)
 
                 # append data into dictionary each transaction
                 for transaction in my_transactions:
